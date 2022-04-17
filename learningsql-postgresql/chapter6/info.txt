@@ -1,0 +1,72 @@
+###### WORKING WITH SETS
+
+You perform a set operation by placing a set operator between two select statements, as demonstrated by the following:
+    
+    SELECT 1 num, 'abc' str
+    UNION 
+    SELECT 9 num, 'xyz' str;
+
+Each column pair from the two sets being combined must contain the same string, number, or date for rows in the 
+two tables to be considered the same.
+
+The set operator, which in this case is union, tells the database server to combine all rows from the two sets. 
+Thus, the final set includes two rows of two columns. This query is known as a compound query because it comprises 
+multiple, otherwise-independent queries.
+
+## Set Operators
+
+The SQL language includes three set operators that allow you to perform each of the various set operations.
+Additionally, each set operator has two flavors, one that includes duplicates and another that removes duplicates 
+(but not necessarily all of the duplicates). The following subsections define each operator and demonstrate how 
+they are used.
+
+--- The union Operator
+
+The union and union all operators allow you to combine multiple data sets. The difference between the two is that 
+union sorts the combined set and removes duplicates, whereas union all does not. With union all, the number of rows 
+in the final data set will always equal the sum of the number of rows in the sets being combined. This operation is 
+the simplest set operation to perform (from the server’s point of view), since there is no need for the server to 
+check for overlapping data. The following example demonstrates how you can use the union all operator to generate 
+a set of first and last names from multiple tables:
+
+    SELECT 'CUST' typ, c.first_name, c.last_name
+    FROM customer AS c 
+    UNION ALL
+    SELECT 'ACTR' typ, a.first_name, a.last_name 
+    FROM actor AS a;
+
+
+--- The intersect Operator
+
+If the two queries in a compound query return nonoverlapping data sets, then the intersection will be an empty set.
+
+Along with the intersect operator, which removes any duplicate rows found in the overlapping region, the ANSI SQL 
+specification calls for an intersect all operator, which does not remove duplicates.
+
+--- The except Operator
+
+The except operator returns the first result set minus any overlap with the second result set. 
+
+
+## Set Operation Rules
+
+--- Sorting Compound Query Results
+
+If you want the results of your compound query to be sorted, you can add an order by clause after the last query. 
+When specifying column names in the order by clause, you will need to choose from the column names in the first 
+query of the compound query. Frequently, the column names are the same for both queries in a compound query, but 
+this does not need to be the case, 
+
+
+## Set Operation Precedence
+
+If your compound query contains more than two queries using different set operators, you need to think about the 
+order in which to place the queries in your compound statement to achieve the desired results.
+
+it’s obvious that it does make a difference how the compound query is arranged when using different set operators. 
+In general, compound queries containing three or more queries are evaluated in order from top to bottom, but with 
+the following caveats:
+
+    • The ANSI SQL specification calls for the intersect operator to have precedence over the other set operators.
+
+    • You may dictate the order in which queries are combined by enclosing multiple queries in parentheses.

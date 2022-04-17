@@ -1,0 +1,171 @@
+####### TRANSACTIONS #######
+
+Database management systems allow a single user to query and modify data, but in today’s world there may be 
+thousands of people making changes to a database simultaneously
+
+If some of the users are adding and/or modifying data, however, the server must handle quite a bit more bookkeeping
+
+## Locking
+
+Locks are the mechanism the database server uses to control simultaneous use of data resources. When some portion 
+of the database is locked, any other users wishing to modify (or possibly read) that data must wait until the lock 
+has been released. Most database servers use one of two locking strategies:
+
+    • Database writers must request and receive from the server a write lock to modify data, and database readers 
+    must request and receive from the server a read lock to query data. While multiple users can read data 
+    simultaneously, only one write lock is given out at a time for each table (or portion thereof), and read 
+    requests are blocked until the write lock is released.
+
+    • Database writers must request and receive from the server a write lock to modify data, but readers do not 
+    need any type of lock to query data. Instead, the server ensures that a reader sees a consistent view of the 
+    data (the data seems the same even though other users may be making modifications) from the time her query 
+    begins until her query has finished. This approach is known as versioning.
+
+There are pros and cons to both approaches. The first approach can lead to long wait times if there are many concurrent 
+read and write requests, and the second approach can be problematic if there are long-running queries while data is 
+being modified
+
+MySQL uses both approaches (depending on your choice of storage engine)
+
+## Lock Granularities
+
+There are also a number of different strategies that you may employ when deciding how to lock a resource. The server 
+may apply a lock at one of three different levels, or granularities:
+
+    • Table locks Keep multiple users from modifying data in the same table simultaneously
+    • Page locks Keep multiple users from modifying data on the same page (a page is a segment of memory 
+      generally in the range of 2 KB to 16 KB) of a table simultaneously
+    • Row locks Keep multiple users from modifying the same row in a table simultaneously
+
+Again, there are pros and cons to these approaches. It takes very little bookkeeping to lock entire tables, but this 
+approach quickly yields unacceptable wait times as the number of users increases. On the other hand, row locking 
+takes quite a bit more bookkeeping, but it allows many users to modify the same table as long as they are interested 
+in different rows.
+
+MySQL uses table, page, or row locking (depending, again, on your choice of storage engine).
+
+the data that appears on the pages of the report will mirror either the state of the database when your report started 
+(if your server uses a versioning approach) or the state of the database when the server issues the reporting 
+application a read lock (if your server uses both read and write locks).
+
+## What Is a Transaction?
+
+one more element is necessary to allow multiple users to access the same data. This extra piece of the concurrency 
+puzzle is the transaction, which is a device for grouping together multiple SQL statements such that either all or 
+none of the statements succeed (a property known as atomicity). If you attempt to transfer $500 from your savings 
+account to your checking account, you would be a bit upset if the money were successfully withdrawn from your 
+savings account but never made it to your checking account. Whatever the reason for the failure (the server was 
+shut down for maintenance, the request for a page lock on the account table timed out, etc.), you want your 
+$500 back.
+
+To protect against this kind of error, the program that handles your transfer request would first begin a transaction, 
+then issue the SQL statements needed to move the money from your savings to your checking account, and, if everything 
+succeeds, end the transaction by issuing the commit command. If something unexpected happens, however, the program 
+would issue a rollback command, which instructs the server to undo all changes made since the transaction began.
+
+By using a transaction, the program ensures that your $500 either stays in your savings account or moves to your 
+checking account, without the possibility of it falling into a crack. Regardless of whether the transaction was 
+committed or was rolled back, all resources acquired (e.g., write locks) during the execution of the transaction 
+are released when the transaction completes.
+
+
+if the program manages to complete both update statements but the server shuts down before a commit or rollback can 
+be executed, then the transaction will be rolled back when the server comes back online. (One of the tasks that a 
+database server must complete before coming online is to find any incomplete transactions that were underway when 
+the server shut down and roll them back.)
+
+Additionally, if your program finishes a transaction and issues a commit but the server shuts down before the changes 
+have been applied to permanent storage (i.e., the modified data is sitting in memory but has not been flushed to disk), 
+then the database server must reapply the changes from your transaction when the server is restarted (a property 
+known as durability).
+
+## Starting a Transaction
+
+Database servers handle transaction creation in one of two ways:
+
+    • An active transaction is always associated with a database session, so there is no need or method to explicitly 
+      begin a transaction. When the current transaction ends, the server automatically begins a new transaction 
+      for your session.
+    
+    • Unless you explicitly begin a transaction, individual SQL statements are automatically committed independently 
+      of one another. To begin a transaction, you must first issue a command.
+
+One of the advantages of first approach to transactions is that, even if you are issuing only a single SQL command, 
+you have the ability to roll back the changes if you don’t like the outcome or if you change your mind.
+
+With the second one, however, once you press the Enter key, the changes brought about by your SQL statement 
+will be permanent
+
+The SQL:2003 standard includes a start transaction command to be used when you want to explicitly begin a transaction
+until you explicitly begin a transaction, you are in what is known as autocommit mode, which means that individual 
+statements are automatically committed by the server. You can, therefore, decide that you want to be in a transaction 
+and issue a start/begin transaction command, or you can simply let the server commit individual statements.
+
+MySQL allow you to turn off autocommit mode for individual sessions, in which case the servers will act just like 
+the first approach regarding to transactions.
+
+MySQL allows you to disable autocommit mode via the following: SET AUTOCOMMIT=0
+
+Once you have left autocommit mode, all SQL commands take place within the scope of a transaction and must be 
+explicitly committed or rolled back.
+
+A word of advice: shut off autocommit mode each time you log in, and get in the habit of running all of your SQL 
+statements within a transaction.
+
+## Ending a Transaction
+
+you must explicitly end your transaction for your changes to become permanent. You do this by way of the commit 
+command, which instructs the server to mark the changes as permanent and release any resources (i.e., page or 
+row locks) used during the transaction.
+
+If you decide that you want to undo all the changes made since starting the transaction, you must issue the 
+rollback command, which instructs the server to return the data to its pre-transaction state. After the 
+rollback has been completed, any resources used by your session are released.
+
+there are several other scenarios by which your transaction can end, either as an indirect result of your actions 
+or as a result of something outside your control:
+
+    • The server shuts down, in which case your transaction will be rolled back automatically when the server 
+      is restarted.
+    • You issue an SQL schema statement, such as alter table, which will cause the current transaction to be 
+      committed and a new transaction to be started.
+    • You issue another start transaction command, which will cause the previous transaction to be committed.
+    • The server prematurely ends your transaction because the server detects a deadlock and decides that your 
+      transaction is the culprit. In this case, the transaction will be rolled back, and you will receive an 
+      error message.
+
+As far as the second scenario is concerned, alterations to a database, cannot be rolled back, so commands that 
+alter your schema must take place outside a transaction. If a transaction is currently underway, therefore, 
+the server will commit your current transaction, execute the SQL schema statement command(s), and then automatically 
+start a new transaction for your session. The server will not inform you of what has happened, so you should be 
+careful that the statements that comprise a unit of work are not inadvertently broken up into multiple transactions 
+by the server
+
+
+## Transaction Savepoints
+
+In some cases, you may encounter an issue within a transaction that requires a rollback, but you may not want to 
+undo all of the work that has transpired. For these situations, you can establish one or more savepoints within a 
+transaction and use them to roll back to a particular location within your transaction rather than rolling all the 
+way back to the start of the transaction.
+
+All savepoints must be given a name, which allows you to have multiple savepoints within a single transaction. 
+To create a savepoint named my_savepoint, you can do the following:
+
+    SAVEPOINT my_savepoint;
+
+To roll back to a particular savepoint, you simply issue the rollback command followed by the keywords to 
+savepoint and the name of the savepoint, as in: 
+    
+    ROLLBACK TO SAVEPOINT my_savepoint;
+
+When using savepoints, remember the following:
+
+    • Despite the name, nothing is saved when you create a savepoint. You must eventually issue a commit if you 
+      want your transaction to be made permanent.
+    • If you issue a rollback without naming a savepoint, all savepoints within the transaction will be ignored, 
+      and the entire transaction will be undone.
+
+
+
+

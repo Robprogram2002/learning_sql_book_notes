@@ -1,0 +1,153 @@
+####### CONDITIONAL LOGIC
+
+Conditional logic is simply the ability to take one of several paths during program execution.
+
+    "case expressions are built into the SQL grammar and can be included in select, insert, 
+    update, and delete statements."
+
+## Searched case Expressions
+
+They have the following syntax:
+    
+    CASE
+        WHEN C1 THEN E1 
+        WHEN C2 THEN E2 
+        ...
+        WHEN CN THEN EN
+        [ELSE ED]
+    END
+
+If the condition in a when clause evaluates to true, then the case expression returns the corresponding expression.
+Additionally, the ED symbol represents the default expression, which the case expression returns if none of the 
+conditions C1, C2, ..., CN evaluate to true (the else clause is optional, which is why it is enclosed in square 
+brackets). 
+
+All the expressions returned by the various when clauses must evaluate to the same type
+
+    CASE
+        WHEN category.name IN ('Children','Family','Sports','Animation') 
+            THEN 'All Ages'
+        WHEN category.name = 'Horror' 
+            THEN 'Adult'
+        WHEN category.name IN ('Music','Games') 
+            THEN 'Teens' ELSE 'Other'
+    END
+
+When the case expression is evaluated, the when clauses are evaluated in order from top to bottom; as soon as one 
+of the conditions in a when clause evaluates to true, the corresponding expression is returned, and any remaining 
+when clauses are ignored.
+
+keep in mind that case expressions may return any type of expression, including subqueries
+
+## Simple case Expressions
+
+The simple case expression is quite similar to the searched case expression but is a bit less flexible. 
+Here’s the syntax:
+
+    CASE V0
+        WHEN V1 THEN E1 
+        WHEN V2 THEN E2 ...
+        WHEN VN THEN EN 
+        [ELSE ED]
+    END
+
+V0 represents a value, and the symbols V1, V2, ..., VN represent values that are to be compared to V0.
+ED represents the expression to be returned if none of the values in the set V1, V2, ..., VN matches the V0 value.
+
+you can’t specify your own conditions, whereas searched case expressions may include range conditions, inequality 
+conditions, and multipart conditions using and/or/not
+
+## Result Set Transformations
+
+As an example, let’s say you have been asked to write a query that shows the number of film rentals for May, June, 
+and July of 2005:
+
+    SELECT monthname(rental_date) rental_month, 
+        count(*) num_rentals 
+    FROM rental
+    WHERE rental_date BETWEEN '2005-05-01' AND '2005-08-01' 
+    GROUP BY monthname(rental_date);
+
+However, you have also been instructed to return a single row of data with three columns (one for each of the 
+three months). To transform this result set into a single row, you will need to create three columns and, within 
+each column, sum only those rows pertaining to the month in question:
+
+SELECT 
+    SUM(CASE WHEN monthname(rental_date) = 'May' THEN 1 
+    ELSE 0 END) May_rentals,
+    SUM(CASE WHEN monthname(rental_date) = 'June' THEN 1
+    ELSE 0 END) June_rentals,
+    SUM(CASE WHEN monthname(rental_date) = 'July' THEN 1 
+    ELSE 0 END) July_rentals 
+FROM rental 
+WHERE rental_date BETWEEN '2005-05-01' AND '2005-08-01';
+
+## Checking for Existence
+
+Sometimes you will want to determine whether a relationship exists between two entities without regard for the 
+quantity. For example, you might want to know whether an actor has appeared in at least one G-rated film, 
+without regard for the actual number of films.
+
+--- Division-by-Zero Errors
+
+When performing calculations that include division, you should always take care to ensure that the denominators 
+are never equal to zero. MySQL simply sets the result of the calculation to null when a zero denominator is 
+encountered.
+
+To safeguard your calculations from encountering errors or, even worse, from being mysteriously set to null, you 
+should wrap all denominators in conditional logic, as demonstrated by the following:
+
+    SELECT c.first_name, c.last_name, 
+        sum(p.amount) tot_payment_amt, 
+        count(p.amount) num_payments, 
+        sum(p.amount) / 
+            CASE WHEN count(p.amount) = 0 THEN 1
+                ELSE count(p.amount) 
+            END avg_payment
+    FROM customer c 
+        LEFT OUTER JOIN payment p 
+        ON c.customer_id = p.customer_id 
+    GROUP BY c.first_name, c.last_name;
+
+
+Since some customers may be new and have yet to rent a film, it is best to include the case expression to ensure 
+that the denominator is never zero
+
+## Conditional Updates
+
+let’s say that you run a job every week that will set the customer.active column to 0 for any customers who haven’t 
+rented a film in the last 90 days. Here’s a statement that will set the value to either 0 or 1 for every customer:
+
+## Handling Null Values
+
+While null values are the appropriate thing to store in a table if the value for a column is unknown, it is not 
+always appropriate to retrieve null values for display or to take part in expressions
+
+When retrieving the data, you can use a case expression to substitute the string if the value is null, as in:
+
+    SELECT c.first_name, c.last_name, 
+        CASE
+            WHEN a.address IS NULL THEN 'Unknown' 
+            ELSE a.address 
+        END address, 
+        CASE
+            WHEN ct.city IS NULL THEN 'Unknown' 
+            ELSE ct.city 
+        END city, 
+        CASE
+            WHEN cn.country IS NULL THEN 'Unknown' 
+            ELSE cn.country 
+        END country 
+    FROM customer c
+        LEFT OUTER JOIN address a 
+        ON c.address_id = a.address_id 
+        LEFT OUTER JOIN city ct 
+        ON a.city_id = ct.city_id 
+        LEFT OUTER JOIN country cn 
+        ON ct.country_id = cn.country_id;
+
+When performing calculations, case expressions are useful for translating a null value into a number 
+(usually 0 or 1) that will allow the calculation to yield a non-null value.
+
+
+

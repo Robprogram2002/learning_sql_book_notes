@@ -1,0 +1,89 @@
+---------- DATA TYPES 
+
+-- CHARACTER DATA TYPES 
+
+Character data can be stored as either fixed-length or variable-length strings; the difference is that fixed-length 
+strings are right-padded with spaces and always consume the same number of bytes, and variable-length strings are 
+not right-padded with spaces and don’t always consume the same number of bytes. When defining a character column, 
+you must specify the maximum size of any string to be stored in the column.
+
+The maximum length for char columns is currently 255 bytes, whereas varchar columns can be up to 65,535 bytes. 
+
+In general, you should use the char type when all strings to be stored in the column are of the same length, such 
+as state abbreviations, and the varchar type when strings to be stored in the column are of varying lengths.
+
+For languages that use the Latin alphabet, such as English, there is a sufficiently small number of characters such
+that only a single byte is needed to store each character. Other languages, such as Japanese and Korean, contain 
+large numbers of characters, thus requiring multiple bytes of storage for each character. Such character sets are 
+therefore called multibyte character sets.
+
+MySQL can store data using various character sets, both single- and multibyte. 
+
+you may choose to use a different character set for each character column in your database, and you can even store 
+different character sets within the same table. To choose a character set other than the default when defining a 
+column, simply name one of the supported character sets after the type definition, as in:
+
+    varchar(20) character set latin1
+
+With MySQL, you may also set the default character set for your entire database:
+    
+    create database european_sales character set latin1;
+
+
+-- Text Data Types
+
+If you need to store data that might exceed the 64 KB limit for varchar columns, you will need to use one of 
+the text types.
+
+When choosing to use one of the text types, you should be aware of the following:
+    * If the data being loaded into a text column exceeds the maximum size for that type, the data will be truncated
+    * Trailing spaces will not be removed when data is loaded into the column
+
+
+-- Numeric Data Types
+
+The most commonly used numeric types are those used to store whole numbers, or integers. When specifying one of these 
+types, you may also specify that the data is unsigned, which tells the server that all data stored in the column 
+will be greater than or equal to zero.
+
+When you create a column using one of the integer types, MySQL will allocate an appropriate amount of space to store 
+the data, which ranges from one byte for a tinyint to eight bytes for a bigint. Therefore, you should try to choose a 
+type that will be large enough to hold the biggest number you can envision being stored in the column without 
+needlessly wasting storage space
+
+When using a floating-point type, you can specify a precision (the total number of allowable digits both to the left 
+and to the right of the decimal point) and a scale (the number of allowable digits to the right of the decimal point), 
+but they are not required
+
+If you specify a precision and scale for your floating-point column, remember that the data stored in the column will 
+be rounded if the number of digits exceeds the scale and/or precision of the column.
+
+Like the integer types, floating-point columns can be defined as unsigned, but this designation only prevents negative 
+numbers from being stored in the column rather than altering the range of data that may be stored in the column.
+
+-- Temporal Data
+
+you will almost certainly be working with information about dates and/or times. This type of data is referred to 
+as temporal. While database servers store temporal data in various ways, the purpose of a format string is to show 
+how the data will be represented when retrieved, along with how a date string should be constructed when inserting 
+or updating a temporal column. Thus, if you wanted to insert the date March 23, 2020, into a date column using the 
+default format YYYY-MM-DD, you would use the string '2020-03-23'.
+
+The datetime, timestamp, and time types also allow fractional seconds of up to 6 decimal places (microseconds). 
+When defining columns using one of these data types, you may supply a value from 0 to 6; for example, specifying 
+datetime(2) would allow your time values to include hundredths of a second.
+
+    * Columns to hold the expected future shipping date of a customer order and an employee’s birth date would use the date type
+    * A column to hold information about when a customer order was actually shipped would use the datetime type
+    * A column that tracks when a user last modified a particular row in a table would use the timestamp type.
+    * Columns that hold data regarding the length of time needed to complete a task would use the time type.
+
+If you construct a string with which to populate a date column and that string does not match the expected format, 
+you will receive another error. In general, it is always a good idea to explicitly specify the format string rather 
+than relying on the default format
+
+#### TABLE CREATION
+
+when you define your table, you need to tell the database server what column or columns will serve as the primary key 
+for the table. You do this by creating a constraint on the table. You can add several types of constraints to a table 
+definition. This constraint is a primary key constraint.

@@ -1,0 +1,67 @@
+########### FILTERING #################
+
+all the SQL data statements (except the insert statement) include an optional where clause containing one or more 
+filter conditions used to restrict the number of rows acted on by the SQL statement. Additionally, the select 
+statement includes a having clause in which filter conditions pertaining to grouped data may be included. 
+
+## Condition Evaluation
+
+A where clause may contain one or more conditions, separated by the operators and and or.
+A condition is made up of one or more expressions combined with one or more operators.
+An expression can be any of the following:
+    • A number 
+    • A column in a table or view 
+    • A string literal, such as 'Maple Street' 
+    • A built-in function, such as concat('Learning', ' ', 'SQL') 
+    • A subquery 
+    • A list of expressions, such as ('Boston', 'New York', 'Chicago')
+
+The operators used within conditions include:
+    • Comparison operators, such as =, !=, <, >, <>, like, in, and between 
+    • Arithmetic operators, such as +, −, *, and /
+
+
+## Condition Types
+
+--- Equality Conditions
+
+title = 'RIVER OUTLAW'
+fed_id = '111-11-1111' amount = 375.25
+film_id = (SELECT film_id FROM film WHERE title = 'RIVER OUTLAW')
+
+The first three examples equate a column to a literal (two strings and a number), and the fourth example 
+equates a column to the value returned from a subquery
+
+--- Inequality conditions
+
+When building inequality conditions, you may choose to use either the != or <> operator.
+the inequality condition, which asserts that two expressions are not equal
+
+--- Range Conditions
+
+you can build conditions that check whether an expression falls within a certain
+range. This type of condition is common when working with numeric or temporal data. 
+
+--- Membership Conditions
+
+In some cases, you will not be restricting an expression to a single value or range of values but rather to a finite 
+set of values. Along with writing your own set of expressions, such as ('G','PG'), you can use a subquery to generate 
+a set for you on the fly. 
+
+
+--- Matching Conditions
+
+So far, you have been introduced to conditions that identify an exact string, a range of strings, or a set of strings; 
+the final condition type deals with partial string matches. 
+
+## Null: That Four-Letter Word
+
+    "null is the absence of a value"
+
+When working with null, you should remember:
+    • An expression can be null, but it can never equal null. 
+    • Two nulls are never equal to each other.
+
+To test whether an expression is null, you need to use the is null operator
+
+If you want to see whether a value has been assigned to a column, you can use the is not null operator.

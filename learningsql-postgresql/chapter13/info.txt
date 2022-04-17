@@ -1,0 +1,203 @@
+################################## INDEXES AND CONSTRAINTS ##################################
+
+When you insert a row into a table, the database server does not attempt to put the data in any particular location 
+within the table. Instead, the server simply places the data in the next available location within the file 
+(the server maintains a list of free space for each table). When you query the customer table, therefore, the 
+server will need to inspect every row of the table to answer the query.
+
+To find all customers whose last name begins with Y, the server must visit each row in the customer table and inspect 
+the contents of the last_name column; if the last name begins with Y, then the row is added to the result set. This 
+type of access is known as a table scan.
+
+An index is simply a mechanism for finding a specific item within a resource.
+
+In the same way that a person uses an index to find words within a publication, a database server uses indexes to 
+locate rows in a table.
+
+    "Indexes are special tables that, unlike normal data tables, are kept in a specific order. Instead of containing 
+    all of the data about an entity, however, an index contains only the column (or columns) used to locate rows in 
+    the data table, along with information describing where the rows are physically located. Therefore, the role of 
+    indexes is to facilitate the retrieval of a subset of a table’s rows and columns without the need to inspect 
+    every row in the table."
+
+## Index Creation
+
+you might decide to add an index on the email column. Here’s how you can add such an index to a MySQL database:
+
+    ALTER TABLE customer 
+    ADD INDEX idx_email (email);
+
+This statement creates an index (a B-tree index to be precise) on the customer.email column; furthermore, the index 
+is given the name idx_email. With the index in place, the query optimizer  can choose to use the index if it is deemed 
+beneficial to do so. If there is more than one index on a table, the optimizer must decide which index will be the 
+most beneficial for a particular SQL statement
+
+All database servers allow you to look at the available indexes. MySQL users can use the show command to see all of the 
+indexes on a specific table, as in:
+
+    SHOW INDEX FROM customer \G;
+
+--- Unique indexes
+
+When designing a database, it is important to consider which columns are allowed to contain duplicate data and which 
+are not. You can enforce a rule against duplicate values by creating a unique index on the customer.email column.
+
+A unique index plays multiple roles; along with providing all the benefits of a regular index, it also serves as a 
+mechanism for disallowing duplicate values in the indexed column. Whenever a row is inserted or when the indexed 
+column is modified, the database server checks the unique index to see whether the value already exists in another 
+row in the table. Here’s how you would create a unique index on the customer.email column:
+
+    ALTER TABLE customer 
+    ADD UNIQUE idx_email (email);
+
+--- Multicolumn indexes
+
+you may also build indexes that span multiple columns. If, for example, you find yourself searching for customers by 
+first and last names, you can build an index on both columns together, as in:
+
+    ALTER TABLE customer
+    ADD INDEX idx_full_name (last_name, first_name);
+
+This index will be useful for queries that specify the first and last names or just the last name, but it would not 
+be useful for queries that specify only the customer’s first name.
+
+When building multiple-column indexes, therefore, you should think carefully about which column to list first, which 
+column to list second, and so on, to help make the index as useful as possible.
+
+Keep in mind, however, that there is nothing stopping you from building multiple indexes using the same set of columns 
+but in a different order if you feel that it is needed to ensure adequate response time.
+
+## Types of Indexes
+
+Indexing is a powerful tool, but since there are many different types of data, a single indexing strategy doesn’t 
+always do the job
+
+--- B-tree indexes
+
+All the indexes shown thus far are balanced-tree indexes, which are more commonly known as B-tree indexes. 
+MySQL, default to Btree indexing, so you will get a B-tree index unless you explicitly ask for another type. 
+As you might expect, B-tree indexes are organized as trees, with one or more levels of branch nodes leading to 
+a single level of leaf nodes. Branch nodes are used for navigating the tree, while leaf nodes hold the actual 
+values and location information
+
+If you were to issue a query to retrieve all customers whose last name starts with G, the server would look at the 
+top branch node (called the root node) and follow the link to the branch node that handles last names beginning with 
+A through M. This branch node would, in turn, direct the server to a leaf node containing last names beginning with 
+G through I. The server then starts reading the values in the leaf node until it encounters a value that doesn’t 
+begin with G
+
+As rows are inserted, updated, and deleted from the customer table, the server will attempt to keep the tree balanced 
+so that there aren’t far more branch/leaf nodes on one side of the root node than the other. The server can add or 
+remove branch nodes to redistribute the values more evenly and can even add or remove an entire level of
+branch nodes. By keeping the tree balanced, the server is able to traverse quickly to the leaf nodes to find the 
+desired values without having to navigate through many levels of branch nodes.
+
+--- Bitmap indexes
+
+Although B-tree indexes are great at handling columns that contain many different values, they can become unwieldy when 
+built on a column that allows only a small number of values. For example, you may decide to generate an index on the 
+customer.active column so that you can quickly retrieve all active or inactive accounts. Because there are only two 
+different values (stored as 1 for active and 0 for inactive), however, and because there are far more active customers, 
+it can be difficult to maintain a balanced B-tree index as the number of customers grows.
+
+For columns that contain only a small number of values across a large number of rows (known as low-cardinality data), 
+a different indexing strategy is needed. To handle this situation more efficiently, Oracle Database includes bitmap 
+indexes, which generate a bitmap for each value stored in the column. If you were to build a bitmap index on the 
+customer.active column, the index would maintain two bitmaps: one for the value 0 and another for the value 1. 
+
+When you write a query to retrieve all inactive customers, the database server can traverse the 0 bitmap and quickly 
+retrieve the desired rows.
+
+Bitmap indexes are a nice, compact indexing solution for low-cardinality data, but this indexing strategy breaks down 
+if the number of values stored in the column climbs too high in relation to the number of rows (known as 
+high-cardinality data), since the server would need to maintain too many bitmaps.
+
+--- Text indexes
+
+## How Indexes Are Used
+
+Indexes are generally used by the server to quickly locate rows in a particular table, after which the server visits 
+the associated table to extract the additional information requested by the user.
+
+But how do you know which of the three options will be utilized? To see how MySQL’s query optimizer decides to execute 
+the query, I use the explain statement to ask the server to show the execution plan for the query rather than executing 
+the query:
+
+    EXPLAIN
+    SELECT customer_id, first_name, last_name 
+    FROM customer
+    WHERE first_name LIKE 'S%' AND last_name LIKE 'P%' \G;
+
+The process that I just led you through is an example of query tuning. Tuning involves looking at an SQL statement 
+and determining the resources available to the server to execute the statement. You can decide to modify the SQL 
+statement, to adjust the database resources, or to do both in order to make a statement run more efficiently.
+
+## The Downside of Indexes
+
+If indexes are so great, why not index everything? Well, the key to understanding why more indexes are not necessarily 
+a good thing is to keep in mind that every index is a table (a special type of table but still a table). Therefore, 
+every time a row is added to or removed from a table, all indexes on that table must be modified. When a row is 
+updated, any indexes on the column or columns that were affected need to be modified as well. Therefore, the more 
+indexes you have, the more work the server needs to do to keep all schema objects up-to-date, which tends to slow 
+things down.
+
+Indexes also require disk space as well as some amount of care from your administrators, so the best strategy is to 
+add an index when a clear need arises. If you need an index for only special purposes, such as a monthly maintenance 
+routine, you can always add the index, run the routine, and then drop the index until you need it again.
+
+In general, you should strive to have neither too many indexes nor too few
+
+## Constraints
+
+A constraint is simply a restriction placed on one or more columns of a table. There are several different types of constraints, including:
+
+ * Primary key constraints Identify the column or columns that guarantee uniqueness within a table
+
+ * Foreign key constraints Restrict one or more columns to contain only values found in another table’s primary key columns
+
+ * Unique constraints Restrict one or more columns to contain unique values within a table (primary key constraints are a special type of unique constraint)
+
+ * Check constraints Restrict the allowable values for a column
+
+Without constraints, a database’s consistency is suspect.
+
+With primary and foreign key constraints in place, however, the server will either raise an error if an attempt is 
+made to modify or delete data that is referenced by other tables or propagate the changes to other tables for you.
+
+--- Constraint Creation
+
+Constraints are generally created at the same time as the associated table via the cre ate table statement.
+
+Alternatively, you could create the customer table without foreign key constraints and add the foreign key 
+constraints later via alter table statements.
+
+    ALTER TABLE customer
+    ADD CONSTRAINT fk_customer_address FOREIGN KEY (address_id) 
+        REFERENCES address (address_id) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+    ALTER TABLE customer
+    ADD CONSTRAINT fk_customer_store FOREIGN KEY (store_id) 
+        REFERENCES store (store_id) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+Both of these statements include several on clauses:
+
+    • on delete restrict, which will cause the server to raise an error if a row is deleted in the parent table 
+        (address or store) that is referenced in the child table (customer)
+    • on update cascade, which will cause the server to propagate a change to the primary key value of a parent 
+        table (address or store) to the child table (customer)
+
+The on delete restrict clause protects against orphaned records when rows are deleted from the parent table
+
+Along with restrict and cascade, you can also choose set null, which will set the foreign key value to null in the 
+child table when a row is deleted or updated in the parent table. Altogether, there are six different options to 
+choose from when defining foreign key constraints:
+
+    • on delete restrict 
+    • on update cascade 
+    • on delete set null 
+    • on update restrict 
+    • on update cascade 
+    • on update set null
+
+These are optional, so you can choose zero, one, or two (one on delete and one on update) of these when defining 
+your foreign key constraints.

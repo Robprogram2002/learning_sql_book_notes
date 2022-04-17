@@ -1,0 +1,82 @@
+#### Querying Multiple Tables
+
+## Cartesian Product (Cross Product)
+
+The easiest way to start is to put the customer and address tables into the from clause of a query and see what happens.
+
+    SELECT c.first_name, c.last_name, a.address
+    FROM customer c JOIN address a;
+
+Because the query didn’t specify how the two tables should be joined, the database server generated the Cartesian 
+product, which is every permutation of the two tables.
+
+## Inner Joins
+
+To modify the previous query so that only a single row is returned for each customer, you need to describe how the 
+two tables are related.
+
+    FROM customer c JOIN address a
+    ON c.address_id = a.address_id;
+
+the on subclause instructs the server to join the customer and address tables by using the address_id column 
+to traverse from one table to the other.
+
+If a value exists for the address_id column in one table but not the other, then the join fails for the rows 
+containing that value, and those rows are excluded from the result set. This type of join is known as an inner 
+join, and it is the most commonly used type of join.
+
+Example, if a row in the customer table has the value 999 in the address_id column and there’s no row in the address 
+table with a value of 999 in the address_id column, then that customer row would not be included in the result set.
+
+If you want to include all rows from one table or the other regardless of whether a match exists, you need to 
+specify an outer join.
+
+In the previous example, I did not specify in the from clause which type of join to use. However, when you wish to 
+join two tables using an inner join, you should explicitly specify this in your from clause.
+
+    "If you do not specify the type of join, then the server will do an inner join by default."
+
+If the names of the columns used to join the two tables are identical, which is true in the previous query, you 
+can use the using subclause instead of the on subclause, as in:
+
+    FROM customer c INNER JOIN address a
+    USING (address_id);
+
+
+## Joining Three or More Tables
+
+With a three-table join, there are three tables and two join types in the from clause, and two on subclauses.
+
+To show each customer’s city, you will need to traverse from the customer table to the address table using the 
+address_id column and then from the address table to the city table using the city_id column. 
+
+At first glance, it might seem like the order in which the tables appear in the from clause is important, 
+but if you switch the table order, you will get the exact same results.
+
+keep in mind that SQL is a nonprocedural language, meaning that you describe what you want to retrieve and which 
+database objects need to be involved, but it is up to the database server to determine how best to execute your 
+query. Using statistics gathered from your database objects, the server must pick one of three tables as a 
+starting point (the chosen table is thereafter known as the driving table) and then decide in which order to join 
+the remaining tables. Therefore, the order in which tables appear in your from clause is not significant.
+
+## Using Subqueries as Tables
+
+## Using the Same Table Twice And Self-Joins
+
+If you are joining multiple tables, you might find that you need to join the same table more than once. 
+Not only can you include the same table more than once in the same query, but you can actually join a table to itself.
+
+Some tables include a self-referencing foreign key, which means that it includes a column that points to the primary 
+key within the same table. While the sample database doesn’t include such a relationship, let’s imagine that the film 
+table includes the column prequel_film_id, which points to the film’s parent (e.g., the film Fiddler Lost II would 
+use this column to point to the parent film Fiddler Lost).
+
+Using a self-join, you can write a query that lists every film that has a prequel, along with the prequel’s title:
+
+    SELECT f.title, f_prnt.title prequel
+    FROM film f
+        INNER JOIN film f_prnt
+        ON f_prnt.film_id = f.prequel_film_id
+    WHERE f.prequel_film_id IS NOT NULL;
+
+This query joins the film table to itself using the prequel_film_id foreign key.

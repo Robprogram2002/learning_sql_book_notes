@@ -1,0 +1,312 @@
+##### Data Generation, Manipulation, and Conversion
+
+--- String Generation
+
+The simplest way to populate a character column is to enclose a string in quotes. Since strings are demarcated by 
+single quotes, you will need to be alert for strings that include single quotes or apostrophes.
+
+To make the server ignore the apostrophe in the word doesn’t, you will need to add an escape to the string so that 
+the server treats the apostrophe like any other character in the string.
+
+    UPDATE string_tbl
+    SET text_fld = 'This string didn\'t work, but it does now';
+
+If you retrieve a string for use in a screen or report field, you don’t need to do anything special to handle embedded 
+quotes:
+
+    SELECT text_fld FROM string_tbl;
+
+However, if you are retrieving the string to add to a file that another program will read, you may want to include 
+the escape as part of the retrieved string. If you are using MySQL, you can use the built-in function quote(), 
+which places quotes around the entire string and adds escapes to any single quotes/apostrophes within the string.
+
+    SELECT quote(text_fld) FROM string_tbl;
+
+When retrieving data for data export, you may want to use the quote() function for all non-system-generated 
+character columns, such as a customer_notes column.
+
+---- Including special characters  
+    
+    SELECT CONCAT('danke sch', CHAR(148), 'n');
+
+If you have a character and need to find its ASCII equivalent, you can use the ascii() function, which takes 
+the leftmost character in the string and returns a number:
+
+    SELECT ASCII('ö');
+
+Using the char(), ascii(), and concat() functions (or concatenation operators), you should be able to work with 
+any Roman language even if you are using a keyboard that does not include accented or special characters
+
+--- String Manipulation
+
+Each database server includes many built-in functions for manipulating strings. This section explores two 
+types of string functions
+
+**** String functions that return numbers
+
+one of the most commonly used is the length() function, which returns the number of characters in the string.
+
+    SELECT LENGTH(char_fld) char_length FROM string_tbl;
+
+The MySQL server removes trailing spaces from char data when it is retrieved, however, so you will see the same 
+results from all string functions regardless of the type of column in which the strings are stored.
+
+
+Along with finding the length of a string, you might want to find the location of a substring within a string. 
+For example, if you want to find the position at which the string 'characters' appears in the vchar_fld column, 
+you could use the position() function, as demonstrated by the following:
+
+    SELECT POSITION('characters' IN vchar_fld) FROM string_tbl;
+
+If the substring cannot be found, the position() function returns 0.
+
+NOTE: remember when working with databases that the first character in a string is at position 1. A return 
+value of 0 from instr() indicates that the substring could not be found, not that the substring was found 
+at the first position in the string
+
+If you want to start your search at something other than the first character of your target string, you will 
+need to use the locate() function, which is similar to the posi tion() function except that it allows an optional 
+third parameter, which is used to define the search’s start position.
+
+    SELECT LOCATE('is', vchar_fld, 5) FROM string_tbl;
+
+the string comparison function strcmp() is implemented only by MySQL takes two strings as arguments and returns one of the following:
+
+    • −1 if the first string comes before the second string in sort order 
+    • 0 if the strings are identical 
+    • 1 if the first string comes after the second string in sort order
+
+    SELECT STRCMP('12345','12345') 12345_12345, 
+           STRCMP('abcd','xyz') abcd_xyz, 
+           STRCMP('abcd','QRSTUV') abcd_QRSTUV, 
+           STRCMP('qrstuv','QRSTUV') qrstuv_QRSTUV
+
+Along with the strcmp() function, MySQL also allows you to use the like and regexp operators to compare strings in the 
+select clause. Such comparisons will yield 1 (for true) or 0 (for false). Therefore, these operators allow you to build 
+expressions that return a number, much like the functions described in this section.
+
+    SELECT name, name LIKE '%y' ends_in_y FROM category;
+
+This example retrieves all the category names, along with an expression that returns 1 if the name ends in “y” or 0 
+otherwise
+
+**** String functions that return strings
+
+Another common use for the concat() function is to build a string from individual pieces of data. For example, the 
+following query generates a narrative string for each customer:
+
+    SELECT concat(first_name, ' ', last_name, ' has been a customer since ', date(create_date)) cust_narrative 
+    FROM customer;
+
+The concat() function can handle any expression that returns a string and will even convert numbers and dates to 
+string format, as evidenced by the date column (create_date) used as an argument
+
+While concat() is useful for adding characters to the beginning or end of a string, you may also have a need to add or 
+replace characters in the middle of a string.
+
+MySQL includes the insert() function, which takes four arguments: the original string, the position at which to start, 
+the number of characters to replace, and the replacement string. Depending on the value of the third argument, the 
+function may be used to either insert or replace characters in a string
+
+    SELECT INSERT('goodbye world', 9, 0, 'cruel ') string;
+
+In this example, all characters starting from position 9 are pushed to the right, and the string 'cruel' is inserted. 
+If the third argument is greater than zero, then that number of characters is replaced with the replacement string, 
+as in
+
+    SELECT INSERT('goodbye world', 1, 7, 'hello') string;
+
+For this example, the first seven characters are replaced with the string 'hello'.
+
+Along with inserting characters into a string, you may have a need to extract a substring from a string. The substring 
+function extracts a specified number of characters starting at a specified position. The following example extracts 
+five characters from a string starting at the ninth position:
+
+    SELECT SUBSTRING('goodbye cruel world', 9, 5);
+
+
+## Working with Numeric Data
+
+You can type a number, retrieve it from another column, or generate it via a calculation. All the usual arithmetic 
+operators (+, -, *, /) are available for performing calculations, and parentheses may be used to dictate precedence
+
+Most of the built-in numeric functions are used for specific arithmetic purposes, such
+as determining the square root of a number
+
+When working with floating-point numbers, you may not always want to interact with or display a number with its full 
+precision. Four functions are useful when limiting the precision of floating-point numbers: ceil(), floor(), round(), 
+and truncate(). 
+
+The ceil() and floor() functions are used to round either up or down to the closest integer, as demonstrated by 
+the following:
+
+    SELECT CEIL(72.445), FLOOR(72.445);
+
+Remember that ceil() will round up even if the decimal portion of a number is very small, and floor() will round 
+down even if the decimal portion is quite significant. you can use the round() function to round up or down from 
+the midpoint between two integers
+
+    SELECT ROUND(72.49999), ROUND(72.5), ROUND(72.0909, 3);
+
+the round() function allows an optional second argument to specify how many digits to the right of the decimal 
+place to round to. 
+
+the truncate() function allows an optional second argument to specify the number of digits to the right of the decimal,
+but truncate() simply discards the unwanted digits without rounding
+
+    SELECT TRUNCATE(72.0909, 1), TRUNCATE(72.0909, 2),
+
+
+## Working with Temporal Data
+
+Because people around the world prefer that noon coincides roughly with the sun’s peak at their location, there has 
+never been a serious attempt to coerce everyone to use a universal clock. Instead, the world has been sliced into 24 
+imaginary sections, called time zones; within a particular time zone, everyone agrees on the current time, whereas 
+people in different time zones do not. 
+
+While this seems simple enough, some geographic regions shift their time by one hour twice a year (implementing what 
+is known as daylight saving time) and some do not, so the time difference between two points on Earth might be four 
+hours for one-half of the year and five hours for the other half of the year.
+
+To ensure a common point of reference for timekeeping, fifteenth-century navigators set their clocks to the time of 
+day in Greenwich, England. This became known as Greenwich Mean Time, or GMT. All other time zones can be described 
+by the number of hours’ difference from GMT; for example, the time zone for the Eastern United States, known as 
+Eastern Standard Time, can be described as GMT −5:00, or five hours earlier than GMT.
+
+Today, we use a variation of GMT called Coordinated Universal Time, or UTC, which is based on an atomic clock 
+(or, to be more precise, the average time of 200 atomic clocks in 50 locations worldwide, which is referred to 
+as Universal Time).
+
+Most database servers default to the time zone setting of the server on which it resides and provide tools for 
+modifying the time zone if needed. For example, a database used to store stock exchange transactions from around 
+the world would generally be configured to use UTC time, whereas a database used to store transactions at a
+particular retail establishment might use the server’s time zone.
+
+--- Generating Temporal Data
+
+You can generate temporal data via any of the following means: 
+
+    • Copying data from an existing date, datetime, or time column 
+    • Executing a built-in function that returns a date, datetime, or time 
+    • Building a string representation of the temporal data to be evaluated by the server
+
+To use the last method, you will need to understand the various components used in formatting dates.
+
+To build a string that the server can interpret as a date, datetime, or time, you need to put the various 
+components together in the following order 
+
+date :   YYYY-MM-DD
+datetime :    YYYY-MM-DD HH:MI:SS 
+timestamp :  YYYY-MM-DD HH:MI:SS 
+time :   HHH:MI:SS
+
+Thus, to populate a datetime column with 3:30 P.M. on September 17, 2019, you will need to build the 
+following string: '2019-09-17 15:30:00'
+
+If the server is expecting a datetime value, such as when updating a datetime column or when calling a built-in 
+function that takes a datetime argument, you can provide a properly formatted string with the required date 
+components, and the server will do the conversion for you
+
+the server will attempt to convert the string for you by parsing the string into the six components (year, month, day,
+ hour, minute, second) included in the default date time format.
+
+If the server is not expecting a datetime value or if you would like to represent the datetime using a nondefault 
+format, you will need to tell the server to convert the string to a datetime.
+
+    SELECT CAST('2019-09-17 15:30:00' AS DATETIME);
+
+--- Functions for generating dates
+
+If you need to generate temporal data from a string and the string is not in the proper form, you can use a built-in 
+function that allows you to provide a format string along with the date string. MySQL includes the str_to_date() 
+function for this purpose
+
+Say, for example, that you pull the string 'September 17, 2019' from a file and need to use it to update a 
+date column. Since the string is not in the required YYYY-MM-DD format, you can use str_to_date() instead of 
+reformatting the strings.
+
+    UPDATE rental 
+    SET return_date = STR_TO_DATE('September 17, 2019', '%M %d, %Y') 
+    WHERE rental_id = 99999;
+
+The second argument in the call to str_to_date() defines the format of the date string, with, in this case, a 
+month name (%M), a numeric day (%d), and a four-digit numeric year (%Y).
+
+(See the book's table for the most commonly used format components.)
+
+The str_to_date() function returns a datetime, date, or time value depending on the contents of the format string. 
+For example, if the format string includes only %H, %i, and %s, then a time value will be returned.
+
+Built-in functions :
+    SELECT CURRENT_DATE(), CURRENT_TIME(), CURRENT_TIMESTAMP();
+
+The values returned by these functions are in the default format for the temporal type being returned
+
+
+## Manipulating Temporal Data
+
+--- Temporal functions that return dates
+
+Many of the built-in temporal functions take one date as an argument and return another date. 
+MySQL’s date_add() function, for example, allows you to add any kind of interval (e.g., days, months, years) to a 
+specified date to generate another date
+
+    SELECT DATE_ADD(CURRENT_DATE(), INTERVAL 5 DAY);
+
+The second argument is composed of three elements: the interval keyword, the desired quantity, and the type of interval
+
+(see the book's table for the most Common interval types)
+
+UPDATE rental
+SET return_date = DATE_ADD(return_date, INTERVAL '3:27:11' HOUR_SECOND) 
+WHERE rental_id = 99999;
+
+In this example, the date_add() function takes the value in the return_date column and adds 3 hours, 27 minutes, and 
+11 seconds to it. Then it uses the value that results to modify the return_date column.
+
+--- Temporal functions that return strings
+
+Most of the temporal functions that return string values are used to extract a portion of a date or time. For example,
+ MySQL includes the dayname() function to determine which day of the week a certain date falls on
+
+    SELECT DAYNAME('2019-09-18');
+
+Many such functions are included with MySQL for extracting information from date values, but I recommend that you 
+use the extract() function instead, since it’s easier to remember a few variations of one function than to remember 
+a dozen different functions. Additionally, the extract() function is part of the SQL:2003 standard
+
+The extract() function uses the same interval types as the date_add() function to define which element of the date 
+interests you. if you want to extract just the year portion of a datetime value, you can do the following:
+
+    SELECT EXTRACT(YEAR FROM '2019-09-18 22:19:05');
+
+--- Temporal functions that return numbers
+
+Another common activity when working with dates is to take two date values and determine the number of intervals 
+(days, weeks, years) between the two dates. For this purpose, MySQL includes the function datediff(), which returns 
+the number of full days between two dates. For example, if I want to know the number of days that my kids will be 
+out of school this summer, I can do the following:
+
+    SELECT DATEDIFF('2019-09-03', '2019-06-21');
+
+The datediff() function ignores the time of day in its arguments. Even if I include a time of day, setting it to one 
+second until midnight for the first date and to one second after midnight for the second date, those times will have 
+no effect on the calculation:
+
+    SELECT DATEDIFF('2019-09-03 23:59:59', '2019-06-21 00:00:01');
+
+## Conversion Functions
+
+While every database server includes a number of proprietary functions used to convert data from one type to another, 
+I recommend using the cast() function, which is included in the SQL:2003 
+
+To use cast(), you provide a value or expression, the as keyword, and the type to which you want the value converted. 
+Here’s an example that converts a string to an integer:
+
+    SELECT CAST('1456328' AS SIGNED INTEGER);
+
+If you are converting a string to a date, time, or datetime value, then you will need to stick with the default 
+formats for each type, since you can’t provide the cast() function with a format string. If your date string is 
+not in the default format (i.e., YYYY-MM-DD HH:MI:SS for datetime types), then you will need to resort to using 
+another function, such as MySQL’s str_to_date() function described earlier in the chapter.
+

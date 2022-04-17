@@ -1,0 +1,360 @@
+####### Analytic Functions #######
+
+After the database server has completed all of the steps necessary to evaluate a query, including joining, filtering, 
+grouping, and sorting, the result set is complete and ready to be returned to the caller. Imagine if you could pause 
+the query execution at this point and take a walk through the result set while it is still held in memory; what types
+of analysis might you want to do? If your result set contains sales data, perhaps you might want to generate rankings 
+for salespeople or regions, or calculate percentage differences between one time period and another. If you are 
+generating results for a financial report, perhaps you would like to calculate subtotals for each report section, 
+and a grand total for the final section
+
+## Data Windows
+
+To accommodate this type of analysis, analytic functions include the ability to group rows into windows, which 
+effectively partition the data for use by the analytic function without changing the overall result set. Windows 
+are defined using the over clause combined with an optional partition by subclause.
+
+Data windows may contain anywhere from a single row to all of the rows in the result set, and different analytic 
+functions can define different data windows
+
+## Localized Sorting
+
+Along with partitioning your result set into data windows for your analytic functions, you may also specify a sort 
+order. For example, if you want to define a ranking number for each month, where the value 1 is given to the month 
+having the highest sales, you will need to specify which column (or columns) to use for the ranking:
+
+    SELECT  quarter(payment_date) quarter, 
+            monthname(payment_date) month_nm, 
+            sum(amount) monthly_sales, 
+            rank() over (order by sum(amount) desc) sales_rank 
+    FROM payment
+    WHERE year(payment_date) = 2005
+    GROUP BY quarter(payment_date), monthname(payment_date) 
+    ORDER BY 1, month(payment_date);
+
+
+The previous example contains two order by clauses, one at the end of the query to determine how the result set 
+should be sorted and another within the rank function to determine how the rankings should be allocated. While it 
+is unfortunate that the same clause is used for different purposes, keep in mind that even if you are using analytic 
+functions with one or more order by clauses, you will still need an order by clause at the end of your query if you 
+want the result set to be sorted in a particular way.
+
+In some cases, you will want to use both the partition by and order by subclauses in the same analytic function call. 
+For example, the previous example can be modified to provide a different set of rankings per quarter, rather than a 
+single ranking across the entire result set:
+
+    SELECT  quarter(payment_date) quarter, 
+            monthname(payment_date) month_nm, 
+            sum(amount) monthly_sales, 
+            rank() over (partition by quarter(payment_date) 
+                order by sum(amount) desc) qtr_sales_rank 
+    FROM payment 
+    WHERE year(payment_date) = 2005
+    GROUP BY quarter(payment_date), monthname(payment_date) 
+    ORDER BY 1, month(payment_date);
+
+## Ranking (People love to rank things)
+
+Companies also like to generate rankings, but for more practical purposes. Knowing which products are the best/worst 
+sellers or which geographic regions generate the least/most revenue helps organizations make strategic decisions
+
+There are multiple ranking functions available in the SQL standard, with each one taking a different approach to how 
+ties are handled:
+
+    * row_number: Returns a unique number for each row, with rankings arbitrarily assigned in case of a tie
+    *rank: Returns the same ranking in case of a tie, with gaps in the rankings 
+    *dense_rank: Returns the same ranking in case of a tie, with no gaps in the rankings
+
+Say that the marketing department wants to identify the top 10 customers so they can be offered a free film rental.
+
+To see how each function handles ties when assigning rankings, the next query adds three more columns, each one 
+employing a different ranking function:
+
+    SELECT customer_id, count(*) num_rentals, 
+            row_number() over (order by count(*) desc) row_number_rnk, 
+            rank() over (order by count(*) desc) rank_rnk, 
+            dense_rank() over (order by count(*) desc) dense_rank_rnk 
+    FROM rental
+    GROUP BY customer_id 
+    ORDER BY 2 desc;
+
+The third column uses the row_number function to assign a unique ranking to each row, without regard to ties with 
+the ranking value arbitrarily assigned for customers who have the same number of film rentals. The next two columns, 
+however, assign the same ranking in case of a tie, but the difference lies in whether or not a gap is left in the 
+ranking values after a tie. 
+
+--- Generating Multiple Rankings
+
+The example in the previous section generates a single ranking across the entire set of customers, but what if 
+you want to generate multiple sets of rankings within the same result set? 
+
+let’s say the marketing department decides to offer free film rentals to the top five customers every month. 
+In order to create a new set of rankings for each month, you will need to add something to the rank function to 
+describe how to divide the result set into different data windows (months, in this case)
+
+    SELECT customer_id, 
+            monthname(rental_date) rental_month, 
+            count(*) num_rentals, 
+            rank() over (partition by monthname(rental_date)
+                order by count(*) desc) rank_rnk 
+    FROM rental
+    GROUP BY customer_id, monthname(rental_date) 
+    ORDER BY 2, 3 desc;
+
+In order to generate the desired results for the marketing department (top five customers from each month), 
+you can simply wrap the previous query in a subquery and add a filter condition to exclude any rows with a 
+ranking higher than five:
+
+    SELECT customer_id, rental_month, num_rentals, rank_rnk ranking
+    FROM
+        (SELECT customer_id, 
+                monthname(rental_date) rental_month, 
+                count(*) num_rentals, 
+                rank() over (partition by monthname(rental_date)
+                    order by count(*) desc) rank_rnk 
+        FROM rental
+        GROUP BY customer_id, monthname(rental_date) 
+        ) cust_rankings
+    WHERE rank_rnk <= 5
+    ORDER BY rental_month, num_rentals desc, rank_rnk;
+
+   "Since analytic functions can be used only in the SELECT clause, you will often need to nest queries if you 
+   need to do any filtering or grouping based on the results from the analytic function."
+
+## Reporting Functions
+
+another common use for analytic functions is to find outliers (e.g., min or max values) or to generate sums or 
+averages across an entire data set. For these types of uses, you will be using aggregate functions 
+(min, max, avg, sum, count), but instead of using them with a group by clause, you will pair them with 
+an over clause.
+
+## Window Frames
+
+Data windows allows you to group rows by common values. But what if you need even finer control over which rows to 
+include in a data window? For example, perhaps you want to generate a running total starting from the beginning of 
+the year up to the current row. For these types of calculations, you can include a “frame” subclause to define 
+exactly which rows to include in the data window. Here’s a query that sums payments for each week and includes a 
+reporting function to calculate the rolling sum:
+
+    SELECT  yearweek(payment_date) payment_week, 
+            sum(amount) week_total,  
+            sum(sum(amount)) 
+                over (order by yearweek(payment_date) 
+                    rows unbounded preceding) rolling_sum 
+    FROM payment
+    GROUP BY yearweek(payment_date) 
+    ORDER BY 1;
+
+includes the rows unbounded preceding subclause to define a data window from the beginning of the result set up to 
+and including the current row. The data window consists of a single row for the first row in the result set, two 
+rows for the second row, etc. The value for the last row is the summation of the entire result set.
+
+Along with rolling sums, you can calculate rolling averages. Here’s a query that calculates a three-week rolling 
+average of total payments:
+
+The rolling_3wk_avg column defines a data window consisting of the current row, the prior row, and the next row
+
+    SELECT  yearweek(payment_date) payment_week, 
+            sum(amount) week_total, 
+            avg(sum(amount)) 
+                over (order by yearweek(payment_date) 
+                    rows between 1 preceding and 1 following) rolling_3wk_avg 
+    FROM payment
+    GROUP BY yearweek(payment_date) 
+    ORDER BY 1;
+
+Specifying a number of rows for your data window works fine in many cases, but if there are gaps in your data, 
+you might want to try a different approach. In the previous result set, for example, there is data for weeks 
+200521, 200522, and 200524, but no data for week 200523. If you want to specify a date interval rather than a 
+number of rows, you can specify a range for your data window, as shown in the following query:
+
+    SELECT  date(payment_date), sum(amount), 
+            avg(sum(amount)) over (order by date(payment_date) 
+                range between interval 3 day preceding 
+                    and interval 3 day following) 7_day_avg
+    FROM payment
+    WHERE payment_date BETWEEN '2005-07-01' AND '2005-09-01' 
+    GROUP BY date(payment_date) 
+    ORDER BY 1;
+
+The 7_day_avg column specifies a range of +/-3 days and will include only those rows whose payment_date values 
+fall within that range
+
+## Lag and Lead
+
+another common reporting task involves comparing values from one row to another. For example, if you are 
+generating monthly sales totals, you may be asked to create a column showing the percentage difference from 
+the prior month, which will require a way to retrieve the monthly sales total from the previous row. This 
+can be accomplished using the lag function, which will retrieve a column value from a prior row in the result 
+set, or the lead function, which will retrieve a column value from a following row. Here’s an example using 
+both functions:
+
+    SELECT  yearweek(payment_date) payment_week, 
+            sum(amount) week_total, 
+            lag(sum(amount), 1) 
+                over (order by yearweek(payment_date)) prev_wk_tot,
+            lead(sum(amount), 1) 
+                over (order by yearweek(payment_date)) next_wk_tot 
+    FROM payment
+    GROUP BY yearweek(payment_date) 
+    ORDER BY 1;
+
+Since there is no row prior to 200521 in the result set, the value generated by the lag function is null for the 
+first row; likewise, the value generated by the lead function is null for the last row in the result set. Both lag 
+and lead allow for an optional second parameter (which defaults to 1) to describe the number of rows 
+prior/following from which to retrieve the column value.
+
+Here’s how you could use the lag function to generate the percentage difference from the prior week:
+
+    SELECT  yearweek(payment_date) payment_week, 
+            sum(amount) week_total, 
+            round((sum(amount) - lag(sum(amount), 1) 
+                over (order by yearweek(payment_date)))
+                / lag(sum(amount), 1)
+                    over (order by yearweek(payment_date)) * 100, 1) pct_diff
+    FROM payment
+    GROUP BY yearweek(payment_date) 
+    ORDER BY 1;
+
+Comparing values from different rows in the same result set is a common practice in reporting systems, so you 
+will likely find many uses for the lag and lead functions
+
+## Column Value Concatenation
+
+Although not technically an analytic function, there is one more important function to demonstrate since it works 
+with groups of rows within a data window. The group_concat function is used to pivot a set of column values into a 
+single delimited string, which is a handy way to denormalize your result set for generating XML or JSON documents
+
+Here’s an example of how this function could be used to generate a comma-delimited list of actors for each film:
+
+-- SELECT quarter(payment_date) quarter, 
+--         monthname(payment_date) month_nm, 
+--         sum(amount) monthly_sales,
+--         max(sum(amount)) ->
+--             over () max_overall_sales,
+--         max(sum(amount)) 
+--             over (partition by quarter(payment_date)) max_qrtr_sales 
+-- FROM payment 
+-- WHERE year(payment_date) = 2005
+-- GROUP BY quarter(payment_date), monthname(payment_date);
+
+
+-- How each rank function handle ties ?
+-- analyze the result set to see the answer
+SELECT customer_id, count(*) num_rentals, 
+        row_number() over (order by count(*) desc) row_number_rnk, 
+        rank() over (order by count(*) desc) rank_rnk, 
+        dense_rank() over (order by count(*) desc) dense_rank_rnk 
+FROM rental
+GROUP BY customer_id 
+ORDER BY 2 desc;
+
+-- The third column uses the row_number function to assign a unique ranking to each row, without regard to ties with 
+-- the ranking value arbitrarily assigned for customers who have the same number of film rentals. The next two columns, 
+-- however, assign the same ranking in case of a tie, but the difference lies in whether or not a gap is left in the 
+-- ranking values after a tie. 
+
+-- Generating multiple ranks for the same column
+
+SELECT customer_id, rental_month, num_rentals, rank_rnk ranking
+FROM
+    (SELECT customer_id, 
+            monthname(rental_date) rental_month, 
+            count(*) num_rentals, 
+            rank() over (partition by monthname(rental_date)
+                order by count(*) desc) rank_rnk 
+    FROM rental
+    GROUP BY customer_id, monthname(rental_date) 
+    ) cust_rankings
+WHERE rank_rnk <= 5
+ORDER BY rental_month, num_rentals desc, rank_rnk;
+
+-- Example of an aggregation funnction with window data
+
+SELECT monthname(payment_date) payment_month, 
+       sum(amount) month_total, 
+       round(sum(amount) / sum(sum(amount)) over ()
+         * 100, 2) pct_of_total 
+FROM payment
+GROUP BY monthname(payment_date);
+
+-- This query calculates the total payments for each month by summing the amount column, and then calculates the 
+-- percentage of the total payments for each month by summing the monthly sums to use as the denominator in the 
+-- calculation
+
+
+-- Reporting functions may also be used for comparisons, such as the next query, which uses a case expression to 
+-- determine whether a monthly total is the max, min, or somewhere in the middle:
+
+SELECT  monthname(payment_date) payment_month, 
+        sum(amount) month_total, 
+        CASE sum(amount) 
+            WHEN max(sum(amount)) over () THEN 'Highest'
+            WHEN min(sum(amount)) over () THEN 'Lowest' ELSE 'Middle'
+        END descriptor 
+FROM payment
+GROUP BY monthname(payment_date);
+
+-- The descriptor column acts as a quasi-ranking function
+
+-- Example of a window frame
+
+SELECT  yearweek(payment_date) payment_week, 
+        sum(amount) week_total,  
+        sum(sum(amount)) 
+            over (order by yearweek(payment_date) 
+                rows unbounded preceding) rolling_sum 
+FROM payment
+GROUP BY yearweek(payment_date) 
+ORDER BY 1;
+
+
+-- changing sum by avg
+-- a query that calculates a three-week rolling average of total payments:
+SELECT  yearweek(payment_date) payment_week, 
+        sum(amount) week_total, 
+        avg(sum(amount)) 
+            over (order by yearweek(payment_date) 
+                rows between 1 preceding and 1 following) rolling_3wk_avg 
+FROM payment
+GROUP BY yearweek(payment_date) 
+ORDER BY 1;
+
+-- using between range instead of number of rows
+
+SELECT  date(payment_date), sum(amount), 
+        avg(sum(amount)) over (order by date(payment_date) 
+            range between interval 3 day preceding 
+                and interval 3 day following) 7_day_avg
+FROM payment
+WHERE payment_date BETWEEN '2005-07-01' AND '2005-09-01' 
+GROUP BY date(payment_date) 
+ORDER BY 1;
+
+--  Lag and Lead analytic function example 
+
+SELECT  yearweek(payment_date) payment_week, 
+        sum(amount) week_total, 
+        lag(sum(amount), 1) 
+            over (order by yearweek(payment_date)) prev_wk_tot,
+        lead(sum(amount), 1) 
+            over (order by yearweek(payment_date)) next_wk_tot 
+FROM payment
+GROUP BY yearweek(payment_date) 
+ORDER BY 1;
+
+-- how you could use the lag function to generate the percentage difference from the prior week:
+
+    SELECT  yearweek(payment_date) payment_week, 
+            sum(amount) week_total, 
+            round((sum(amount) - lag(sum(amount), 1) 
+                over (order by yearweek(payment_date)))
+                / lag(sum(amount), 1)
+                    over (order by yearweek(payment_date)) * 100, 1) pct_diff
+    FROM payment
+    GROUP BY yearweek(payment_date) 
+    ORDER BY 1;
+
+The group_concat function acts like a special type of aggregate function that pivots all of the last names of 
+all actors appearing in each film into a single string. 
+

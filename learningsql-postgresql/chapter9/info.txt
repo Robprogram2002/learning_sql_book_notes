@@ -1,0 +1,228 @@
+############# Subqueries
+
+Subqueries are a powerful tool that you can use in all four SQL data statements.
+
+A subquery is a query contained within another SQL statement (which I refer to as the containing statement for the 
+rest of this discussion). A subquery is always enclosed within parentheses, and it is usually executed prior to the 
+containing statement.
+
+The type of result set returned by the subquery determines how it may be used and which operators the containing 
+statement may use to interact with the data the subquery returns. When the containing statement has finished executing, 
+the data returned by any subqueries is discarded, making a subquery act like a temporary table with statement scope 
+(meaning that the server frees up any memory allocated to the subquery results after the SQL statement has finished 
+execution).
+
+### Subquery Types
+
+Along with the differences noted previously regarding the type of result set returned by a subquery 
+(single row/column, single row/multicolumn, or multiple columns), you can use another feature to differentiate 
+subqueries
+
+some subqueries are completely self-contained (called noncorrelated subqueries), while others reference columns from 
+the containing statement (called correlated subqueries). The next several sections explore these two subquery types 
+and show the different operators that you can employ to interact with them.
+
+--- Noncorrelated Subqueries
+
+it may be executed alone and does not reference anything from the containing statement. Most subqueries that you 
+encounter will be of this type .
+
+Along with being noncorrelated, the example from earlier in the chapter also returns a result set containing a single 
+row and column. This type of subquery is known as a scalar subquery and can appear on either side of a condition using 
+the usual operators (=, <>, <, >, <=, >=). 
+
+The next example shows how you can use a scalar subquery in an inequality condition:
+
+SELECT city_id, city 
+FROM city
+WHERE country_id <> (SELECT country_id FROM country WHERE country = 'India')
+
+The subquery, which is found on the last line of the statement, returns the country ID for India, and the 
+containing query returns all cities that do not have that country ID.
+
+While the subquery in this example is quite simple, subqueries may be as complex as you need them to be, and they 
+may utilize any and all the available query clauses (select, from, where, group by, having, and order by).
+
+If you use a subquery in an equality condition but the subquery returns more than one row, you will receive an error.
+(In other words, a single thing cannot be equated to a set of things.)
+
+--- Multiple-Row, Single-Column Subqueries
+
+there are four additional operators that you can use to build conditions with these types of subqueries.
+
+While you can’t equate a single value to a set of values, you can check to see whether a single value can be found 
+within a set of values using the IN operator. 
+
+Although you will occasionally create a set of strings, dates, or numbers to use on one side of a condition, you are 
+more likely to generate the set using a subquery that returns one or more rows.
+
+The all operator: allows you to make comparisons between a single value and every value in a set. To build such a
+condition, you will need to use one of the comparison operators (=, <>, <, >, etc.) in conjunction with the all 
+operator. 
+
+For example, the next query finds all customers who have never gotten a free film rental:
+
+    SELECT first_name, last_name 
+    FROM customer 
+    WHERE customer_id <> ALL 
+        (SELECT customer_id -> FROM payment -> WHERE amount = 0);
+
+The subquery returns the set of IDs for customers who have paid $0 for a film rental, and the containing query 
+returns the names of all customers whose ID is not in the set returned by the subquery.
+
+Here’s another example using the all operator, but this time the subquery is in the having clause:
+
+The any operator : Like the all operator, the any operator allows a value to be compared to the members of a set of 
+values; unlike all, however, a condition using the any operator evaluates to true as soon as a single comparison is 
+favorable. 
+
+--- Multicolumn Subqueries
+
+you can use subqueries that return two or more columns. To show the utility of multicolumn subqueries, it might help 
+to look first at an example that uses multiple, single-column subqueries:
+
+    SELECT fa.actor_id, fa.film_id 
+    FROM film_actor fa
+    WHERE fa.actor_id IN 
+    (SELECT actor_id FROM actor WHERE last_name = 'MONROE') 
+    AND fa.film_id IN 
+    (SELECT film_id FROM film WHERE rating = 'PG');
+
+This query uses two subqueries to identify all actors with the last name Monroe and all films rated PG, and the 
+containing query then uses this information to retrieve all cases where an actor named Monroe appeared in a PG 
+film. However, you could merge the two single-column subqueries into one multicolumn subquery and compare the 
+results to two columns in the film_actor table. To do so, your filter condition must name both columns from the 
+film_actor table surrounded by parentheses and in the same order as returned by the subquery, as in:
+
+SELECT actor_id, film_id 
+FROM film_actor 
+WHERE (actor_id, film_id) IN 
+    (
+        SELECT a.actor_id, f.film_id 
+        FROM actor a 
+            CROSS JOIN film f
+        WHERE a.last_name = 'MONROE' AND f.rating = 'PG'
+    );
+
+
+### Correlated Subqueries
+
+All of the subqueries shown thus far have been independent of their containing statements, meaning that you can 
+execute them by themselves and inspect the results. A correlated subquery, on the other hand, is dependent on its 
+containing statement from which it references one or more columns. Unlike a noncorrelated subquery, a correlated 
+subquery is not executed once prior to execution of the containing statement; instead, the correlated subquery is 
+executed once for each candidate row (rows that might be included in the final results). For example, the following 
+query uses a correlated subquery to count the number of film rentals for each customer, and the containing query 
+then retrieves those customers who have rented exactly 20 films:
+
+    SELECT c.first_name, c.last_name 
+    FROM customer c 
+    WHERE 20 = 
+        (SELECT count(*) FROM rental r 
+        WHERE r.customer_id = c.customer_id);
+
+The reference to c.customer_id at the very end of the subquery is what makes the subquery correlated; the containing 
+query must supply values for c.customer_id for the subquery to execute. In this case, the containing query retrieves 
+all 599 rows from the customer table and executes the subquery once for each customer, passing in the appropriate 
+customer ID for each execution. If the subquery returns the value 20, then the filter condition is met, and the row 
+is added to the result set.
+
+One word of caution: since the correlated subquery will be executed once for each row of the containing query, the 
+use of correlated subqueries can cause performance issues if the containing query returns a large number of rows.
+
+Along with equality conditions, you can use correlated subqueries in other types of conditions, such as the 
+range condition illustrated here:
+
+    SELECT c.first_name, c.last_name 
+    FROM customer c 
+    WHERE 
+        (SELECT sum(p.amount) FROM payment p 
+        WHERE p.customer_id = c.customer_id) 
+        BETWEEN 180 AND 240;
+
+the correlated subquery is executed 599 times (once for each customer row), and each execution of the subquery 
+returns the total account balance for the given customer.
+
+The exists Operator: the most common operator used to build conditions that utilize correlated subqueries is the 
+exists operator. You use the exists operator when you want to identify that a relationship exists without regard 
+for the quantity; for example, the following query finds all the customers who rented at least one film prior 
+to May 25, 2005, without regard for how many films were rented:
+
+    SELECT c.first_name, c.last_name 
+    FROM customer c 
+    WHERE EXISTS 
+        (SELECT 1 FROM rental r 
+        WHERE r.customer_id = c.customer_id 
+            AND date(r.rental_date) < '2005-05-25');
+
+Using the exists operator, your subquery can return zero, one, or many rows, and the condition simply checks whether 
+the subquery returned one or more rows. If you look at the select clause of the subquery, you will see that it 
+consists of a single literal (1); since the condition in the containing query only needs to know how many rows 
+have been returned, the actual data the subquery returned is irrelevant
+
+You may also use not exists to check for subqueries that return no rows, as demonstrated by the following:
+
+    SELECT a.first_name, a.last_name  
+    FROM actor a 
+    WHERE NOT EXISTS 
+        (SELECT 1 
+        FROM film_actor fa
+            INNER JOIN film f ON f.film_id = fa.film_id
+        WHERE fa.actor_id = a.actor_id 
+            AND f.rating = 'R');
+
+This query finds all actors who have never appeared in an R-rated film.
+
+### Data Manipulation Using Correlated Subqueries
+
+Subqueries are used heavily in update, delete, and insert statements as well, with correlated subqueries appearing 
+frequently in update and delete statements. Here’s an example of a correlated subquery used to modify the last_update 
+column in the customer table:
+
+    UPDATE customer c 
+    SET c.last_update =
+        (SELECT max(r.rental_date) FROM rental r WHERE r.customer_id = c.customer_id);
+    
+This statement modifies every row in the customer table (since there is no where clause) by finding the latest rental 
+date for each customer in the rental table
+
+Correlated subqueries are also common in delete statements. For example, you may run a data maintenance script at the 
+end of each month that removes unnecessary data. The script might include the following statement, which removes rows 
+from the customer table where there have been no film rentals in the past year:
+
+    DELETE FROM customer 
+    WHERE 365 < ALL
+        (SELECT datediff(now(), r.rental_date) days_since_last_rental 
+        FROM rental r
+        WHERE r.customer_id = customer.customer_id);
+
+### Subqueries as Data Sources
+
+Since a subquery generates a result set containing rows and columns of data, it is perfectly valid to include 
+subqueries in your from clause along with tables
+
+
+Subqueries offer immense flexibility when writing queries, because you can go far beyond the set of available tables 
+to create virtually any view of the data that you desire and then join the results to other tables or subqueries. 
+If you are writing reports or generating data feeds to external systems, you may be able to do things with a single 
+query that used to demand multiple queries or a procedural language to accomplish
+
+### Task-oriented subqueries
+
+Let’s say that you want to generate a report showing each customer’s name, along with their city, the total number 
+of rentals, and the total payment amount. 
+
+You can create  a subquery to make the groupint task and the contain query is responsible for joining the rest of the 
+data only needed for displaying purposes. 
+
+### Common table expressions (CTEs)
+
+A CTE is a named subquery that appears at the top of a query in a with clause, which can contain multiple CTEs 
+separated by commas. Along with making queries more understandable, this feature also allows each CTE to refer 
+to any other CTE defined above it in the same with clause
+
+### Subqueries as Expression Generators
+
+long with being used in filter conditions, scalar subqueries may be used wherever an expression can appear, 
+including the select and order by clauses of a query and the values clause of an insert statement.
+

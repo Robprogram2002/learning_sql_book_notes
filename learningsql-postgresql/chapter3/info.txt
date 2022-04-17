@@ -1,0 +1,129 @@
+##### Query Mechanics: how queries are executed by the MySQL server?
+
+Once the server has verified that your username and password are correct, a database connection is generated 
+for you to use. This connection is held by the application that requested it (which, in this case, is the 
+mysql tool) until the application releases the connection (i.e., as a result of typing quit) or the server 
+closes the connection (i.e., when the server is shut down). Each connection to the MySQL server is assigned 
+an identifier,
+
+Each time a query is sent to the server, the server checks the following things prior to statement execution:
+    * Do you have permission to execute the statement?
+    * Do you have permission to access the desired data?
+    * Do you have permission to access the desired data?
+
+If your statement passes these three tests, then your query is handed to the query optimizer, whose job it is 
+to determine the most efficient way to execute your query. The optimizer looks at such things as the order in 
+which to join the tables named in your from clause and what indexes are available, and then it picks an execution 
+plan, which the server uses to execute your query.
+
+
+Once the server has finished executing your query, the result set is returned to the calling application.
+A result set is just another table containing rows and columns. If your query fails to yield any results, 
+the mysql tool will show you : Empty set message
+
+
+### Query Clauses
+
+Several components or clauses make up the select statement. 
+
+###### The select Clause
+
+Even though the select clause is the first clause of a select statement, it is one of the last clauses that the 
+database server evaluates. The reason for this is that before you can determine what to include in the final 
+result set, you need to know all of the possible columns that could be included in the final result set. In 
+order to fully understand the role of the select clause, therefore, you will need to understand a bit about the 
+from clause.
+
+    "The select clause determines which of all possible columns should be included in the query’s result set."
+
+However, you can spice things up in your select clause by including things such as:
+    * Literals, such as numbers or strings
+    * Expressions, such as transaction.amount * −1
+    * Built-in function calls, such as ROUND(transaction.amount, 2)
+    * User-defined function calls
+
+###### The From Clause
+
+Although most SQL books define the from clause as simply a list of one or more tables, I would like to broaden 
+the definition as follows:
+
+    "The from clause defines the tables used by a query, along with the means of linking the tables together."
+
+-- TABLE PART
+
+When confronted with the term table, most people think of a set of related rows stored in a database. While this 
+does describe one type of table, I would like to use the word in a more general way by removing any notion of how 
+the data might be stored and concentrating on just the set of related rows. Four different types of tables meet 
+this relaxed definition
+
+    • Permanent tables (i.e., created using the create table statement) 
+    • Derived tables (i.e., rows returned by a subquery and held in memory) 
+    • Temporary tables (i.e., volatile data held in memory) 
+    • Virtual tables (i.e., created using the create view statement)
+
+Each of these table types may be included in a query’s from clause.
+
+
+----- Derived (subquery-generated) tables
+
+A subquery is a query contained within another query. Subqueries are surrounded by parentheses and can be found 
+in various parts of a select statement; within the from clause, however, a subquery serves the role of generating 
+a derived table that is visible from all other query clauses and can interact with other tables named 
+in the from clause. 
+
+----- Temporary tables
+
+every relational database allows the ability to define volatile, or temporary, tables. These tables look just 
+like permanent tables, but any data inserted into a temporary table will disappear at some point (generally at 
+the end of a transaction or when your database session is closed)
+
+----- Views
+
+A view is a query that is stored in the data dictionary. It looks and acts like a table, but there is no data 
+associated with a view (this is why I call it a virtual table). When you issue a query against a view, your 
+query is merged with the view definition to create a final query to be executed.
+
+When the view is created, no additional data is generated or stored: the server simply tucks away the select 
+statement for future use. Views are created for various reasons, including to hide columns from users and to 
+simplify complex database designs
+
+-- Table Links
+
+if more than one table appears in the from clause, the conditions used to link the tables must be included as well.
+his is not a requirement of MySQL or any other database server, but it is the ANSI-approved method of joining 
+multiple tables, and it is the most portable across the various database servers.
+
+Join conditions for the two tables are found in the on subclause of the from clause;
+
+
+###### The Where Clause
+
+Most of the time, however, you will not want to retrieve every row from a table but will want a way to filter out 
+those rows that are not of interest. This is a job for the where clause.
+
+    "The where clause is the mechanism for filtering out unwanted rows from your result set"
+
+You should always use parentheses to separate groups of conditions when mixing different operators so that you, 
+the database server, and anyone who comes along later to modify your code will be on the same page.
+
+###### The group by and having Clauses
+
+All the queries thus far have retrieved raw data without any manipulation. Sometimes, however, you will want to 
+find trends in your data that will require the database server to cook the data a bit before you retrieve your 
+result set. One such mechanism is the group by clause, which is used to group data by column values.
+
+When using the group by clause to generate groups of rows, you may also use the having clause, which allows you to 
+filter grouped data in the same way the where clause lets you filter raw data.
+
+
+###### The Order By clause 
+
+In general, the rows in a result set returned from a query are not in any particular order. If you want your result 
+set to be sorted, you will need to instruct the server to sort the results using the order by clause.
+
+    "The order by clause is the mechanism for sorting your result set using either raw column data or expressions 
+    based on column data."
+
+When sorting, you have the option of specifying ascending or descending order via the asc and desc keywords. 
+The default is ascending, so you will need to add the desc keyword if you want to use a descending sort
+
