@@ -1,0 +1,58 @@
+Well-designed applications generally expose a public interface while keeping implementation details private, 
+thereby enabling future design changes without impacting end users. When designing your database, you can 
+achieve a similar result by keeping your tables private and allowing your users to access data only through 
+a set of views.
+
+A view is simply a mechanism for querying data. Unlike tables, views do not involve data storage. You create 
+a view by assigning a name to a select statement and then storing the query for others to use. Other users 
+can then use your view to access data just as though they were querying tables directly (in fact, they may 
+not even know they are using a view).
+
+The marketing department, for example, may need access to email addresses in order to advertise promotions, 
+but otherwise your company’s privacy policy dictates that this data be kept secure. Therefore, instead of 
+allowing direct access to the customer table, you define a view called customer_vw and mandate that all 
+nonmarketing personnel use it to access customer data.
+
+## Why Use Views?
+
+#### Data Security
+If you create a table and allow users to query it, they will be able to access every column and every row in 
+the table. however, your table may include some columns that contain sensitive data, such as identification 
+numbers or credit card numbers; not only is it a bad idea to expose such data to all users, but also it might 
+violate your company’s privacy policies, or even state or federal laws, to do so.
+The best approach for these situations is to keep the table private (i.e., don’t grant select permission to 
+any users) and then to create one or more views that either omit or obscure the sensitive columns. 
+You may also constrain which rows a set of users may access by adding a where clause to your view definition.
+
+#### Data Aggregation
+views are a great way to make aggregated data appear as though data is being preaggregated and stored in the database
+
+#### Hiding Complexity
+
+#### Joining Partitioned Data
+Some database designs break large tables into multiple pieces in order to improve performance. For example, if the 
+payment table became large, the designers may decide to break it into two tables: payment_current, which holds the 
+latest six months of data, and payment_historic, which holds all data up to six months ago. If a customer wants to 
+see all the payments for a particular customer, you would need to query both tables. By creating a view, however, 
+you can make it look like all payment data is stored in a single table.
+
+Using a view in this case is a good idea because it allows the designers to change the structure of the 
+underlying data without the need to force all database users to modify their queries.
+
+
+## Updatable Views
+If you provide users with a set of views to use for data retrieval, what should you do if the users also need to 
+modify the same data? For this purpose, MySQL, Oracle Database, and SQL Server all allow you to modify data 
+through a view, as long as you abide by certain restrictions. In the case of MySQL, a view is updatable if 
+the following conditions are met:
+
+• No aggregate functions are used (max(), min(), avg(), etc.). 
+• The view does not employ group by or having clauses. 
+• No subqueries exist in the select or from clause, and any subqueries in the where clause do not refer to 
+tables in the from clause.
+• The view does not utilize union, union all, or distinct. 
+• The from clause includes at least one table or updatable view. 
+• The from clause uses only inner joins if there is more than one table or view.
+
+On the other hand, views that contain derived columns cannot be used for inserting data, even if the 
+derived columns are not included in the statement.
