@@ -182,7 +182,7 @@ SELECT
    (SELECT MAX(home_team_goal + away_team_goal) 
     FROM Match
     WHERE id IN (
-          SELECT id FROM Match WHERE  strftime('%m', date) = 07)) AS july_max_goals
+          SELECT id FROM Match WHERE  strftime('%m', date) = '07')) AS july_max_goals
 FROM Match
 GROUP BY season;
 
@@ -208,3 +208,47 @@ LEFT JOIN (
 ON c.id = outer_s.country_id
 GROUP BY Country;
 
+
+-- How do you get both the home and away team names into one final query result?
+
+-- using simple subqueries
+
+SELECT
+	m.date,
+    home.hometeam,
+    away.awayteam,
+    m.home_team_goal,
+    m.away_team_goal
+FROM Match AS m
+-- Join the home subquery to the match table
+LEFT JOIN (
+  SELECT Match.id, team.team_long_name AS hometeam
+  FROM Match
+  LEFT JOIN Team AS team
+  ON Match.home_team_api_id = team.team_api_id) AS home
+ON home.id = m.id
+-- Join the away subquery to the match table
+LEFT JOIN (
+  SELECT match.id, team.team_long_name AS awayteam
+  FROM Match AS match
+  LEFT JOIN Team AS team
+  -- Get the away team ID in the subquery
+  ON match.away_team_api_id = team.team_api_id) AS away
+ON away.id = m.id;
+
+
+-- using correated subqueries
+
+SELECT
+    m.date,
+    (SELECT team_long_name
+     FROM Team AS t
+     WHERE t.team_api_id = m.home_team_api_id) AS hometeam,
+    -- Connect the team to the match table
+    (SELECT team_long_name
+     FROM Team AS t
+     WHERE t.team_api_id = m.away_team_api_id) AS awayteam,
+    -- Select home and away goals
+     m.home_team_goal,
+     m.away_team_goal
+FROM Match AS m;
